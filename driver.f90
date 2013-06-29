@@ -4,7 +4,6 @@ integer :: nstep,nwrite,nx,nz
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:)
 
 contains
-
  integer function read_integer(k,variable)
  implicit none
  integer :: k, variable
@@ -85,7 +84,6 @@ contains
  write(*,*)'Welcome to the Transverse-Magnetic solver'
  write(*,*)'Private release, Daniel Jimenez (2013)'
  end subroutine welcome_message
-
 end module engine
 
 program fdtd
@@ -102,11 +100,12 @@ contains
 subroutine propagation_cycle
 implicit none
 integer :: i,cont
- call write_data
+ open(unit=12,file='E.dat')
+ call dump_out
  cont=1
  do i=1,nstep
   if(cont==nwrite)then
-   call write_data
+   call dump_out
    cont=1
   else
    cont=cont+1
@@ -114,5 +113,10 @@ integer :: i,cont
   call propagate_H
   call propagate_E
  end do
+ close(12)
 end subroutine propagation_cycle
+subroutine dump_out
+implicit none
+
+end subroutine dump_out
 end program fdtd
