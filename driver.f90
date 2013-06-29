@@ -14,7 +14,7 @@ contains
   read_integer=k+1
  end function read_integer
 
- subroutine intialize_and_read_paramters
+ subroutine initialize_and_read_parameters
  implicit none
   nstep=128
   nwrite=32
@@ -27,7 +27,7 @@ contains
   allocate(Ez(nx,nz+1))
   allocate(H(nx,nz))
   Ex=0.0;Ez=0.0;H=0.0;
- end subroutine intialize_and_read_parameters
+ end subroutine initialize_and_read_parameters
 
  subroutine read_default_values
  implicit none
@@ -48,7 +48,7 @@ contains
 
  subroutine impose_initial_conditions
  implicit none
- end subroutine impose_intial_conditions
+ end subroutine impose_initial_conditions
 
  subroutine propagate_H
  implicit none
