@@ -1,5 +1,6 @@
 module engine
-real :: econst,hconst,cz,cx
+real :: cz,cx,dx,dz,dt,c
+parameter (c=29979245800)
 integer :: nstep,nwrite,nx,nz
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:)
 
@@ -13,6 +14,17 @@ contains
   read_integer=k+1
  end function read_integer
 
+ subroutine randomize_randomness
+ implicit none
+ integer M=2
+  call date_and_time(real_clock(1), real_clock(2), &
+                     real_clock(3), date_time)
+  time_seed(1) = date_time(6)+date_time(7)+date_time(8)
+  time_seed(2) = date_time(1)+date_time(2)+date_time(8)
+  call random_seed(size=M)
+  call random_seed(put=time_seed(1:M))
+ end subroutine randomize_randomness
+
  subroutine initialize_and_read_parameters
  implicit none
   nstep=128
@@ -22,16 +34,27 @@ contains
   else
    call read_command_line_arguments
   endif
+  call allocate_fields
+  dt=min(dx,dz)
+  dt=dx/(10*c)
+  cx=c*dt/dx
+  cz=c*dt/dz
+ end subroutine initialize_and_read_parameters
+
+ subroutine allocate_fields
+ implicit none
   allocate(Ex(nx+1,nz))
   allocate(Ez(nx,nz+1))
   allocate(H(nx,nz))
   Ex=0.0;Ez=0.0;H=0.0;
- end subroutine initialize_and_read_parameters
+ end subroutine allocate_fields
 
  subroutine read_default_values
  implicit none
   nx=1000
   nz=1000
+  dx=5e-7
+  dz=dx
  end subroutine read_default_values
 
  subroutine read_command_line_arguments
@@ -43,6 +66,7 @@ contains
 
  subroutine build_physical_space
  implicit none
+ eps=1.0
  end subroutine build_physical_space
 
  subroutine impose_initial_conditions
@@ -54,8 +78,8 @@ contains
  integer :: i,k
  do i=1,nx
   do k=1,nz
-   H(i,k)=H(i,k)+hconst*( cx*(Ez(i+1,k)-Ez(i,k))&
-                         -cz*(Ex(i,k+1)-Ex(i,k)))
+   H(i,k)=H(i,k)+( cx*(Ez(i+1,k)-Ez(i,k))&
+                  -cz*(Ex(i,k+1)-Ex(i,k)))
   end do
  end do
  end subroutine propagate_H
@@ -65,16 +89,16 @@ contains
  integer :: i,k
  ! these are needed...
  do k=2,nz
-  Ex(1,k)=Ex(1,k)+econst*cz*(H(1,k)-H(1,k-1))
+  Ex(1,k)=Ex(1,k)+cz*(H(1,k)-H(1,k-1))/eps(1,k)
  end do
  do i=2,nx
-  Ez(i,1)=Ez(i,1)+econst*cx*(H(i,1)-H(i,1))
+  Ez(i,1)=Ez(i,1)+cx*(H(i,1)-H(i,1))/eps(i,1)
  end do
  ! ...so that these share the loop
  do i=2,nx
   do k=2,nz
-   Ex(i,k)=Ex(i,k)+econst*cz*(H(i,k)-H(i,k-1))
-   Ez(i,k)=Ez(i,k)+econst*cx*(H(i,k)-H(i-1,k))
+   Ex(i,k)=Ex(i,k)+cz*(H(i,k)-H(i,k-1))/eps(i,k)
+   Ez(i,k)=Ez(i,k)+cx*(H(i,k)-H(i-1,k))/eps(i,k)
   end do
  end do
  end subroutine propagate_E
@@ -101,6 +125,7 @@ subroutine propagation_cycle
 implicit none
 integer :: i,cont
  open(unit=12,file='E.dat')
+ call randomize_randomness
  call dump_out
  cont=1
  do i=1,nstep
@@ -115,8 +140,11 @@ integer :: i,cont
  end do
  close(12)
 end subroutine propagation_cycle
+
 subroutine dump_out
 implicit none
+real :: ran
+  call random_number(ran)
 
 end subroutine dump_out
 end program fdtd
