@@ -32,15 +32,7 @@ contains
  integer :: i,k,imax,kmax
  imax=width/dx
  kmax=length/dz
- do i=0,imax
-  do k=0,kmax
-   Ex(nx/2+i,nz/2+k)=exp(-(i*dx/width)**2-(k*dz/width))&
-                    *cos(2*pi*k*dz/wavelength)
-   Ex(nx/2-i,nz/2-k)=Ex(nx/2+i,nz/2+k)
-   Ex(nx/2-i,nz/2+k)=Ex(nx/2+i,nz/2+k)
-   Ex(nx/2+i,nz/2-k)=Ex(nx/2+i,nz/2+k)
-  end do
- end do
+   Ex(500,500)=1.0
  end subroutine impose_initial_conditions
 
  subroutine randomize_randomness
@@ -57,8 +49,8 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=128
-  nwrite=32
+  nstep=4
+  nwrite=1
   nfield=2400
   if(command_argument_count().eq.0)then
    call read_default_values
@@ -198,8 +190,8 @@ integer :: i,k
 !  endif
 !  if(counter.ge.nfield)exit
 ! end do
-do i=1,nx,4
- do k=1,nz,4
+do i=1,nx,1
+ do k=1,nz,1
    edx=(Ex(i,k+1)+Ex(i,k))/2
    edz=(Ez(i+1,k)+Ez(i,k))/2
    write(12,*)i,k,edx,edz
