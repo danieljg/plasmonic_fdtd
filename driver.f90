@@ -32,7 +32,14 @@ contains
  integer :: i,k,imax,kmax
  imax=width/dx
  kmax=length/dz
-   Ex(500,500)=1.0
+ do i=0,20
+  do k=0,20
+   Ex(nx/2+i,nz/2+k)=exp(-(i**2+k**2)/12.)
+   Ex(nx/2+i,nz/2-k)=exp(-(i**2+k**2)/12.)
+   Ex(nx/2-i,nz/2+k)=exp(-(i**2+k**2)/12.)
+   Ex(nx/2-i,nz/2-k)=exp(-(i**2+k**2)/12.)
+  end do
+ end do
  end subroutine impose_initial_conditions
 
  subroutine randomize_randomness
@@ -49,8 +56,8 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=4
-  nwrite=1
+  nstep=960
+  nwrite=16
   nfield=2400
   if(command_argument_count().eq.0)then
    call read_default_values
@@ -76,8 +83,8 @@ contains
 
  subroutine read_default_values
  implicit none
-  nx=1000
-  nz=1000
+  nx=100
+  nz=100
   dx=5e-7
   dz=dx
  end subroutine read_default_values
@@ -93,8 +100,12 @@ contains
 
  subroutine build_physical_space
  implicit none
+ integer :: i,k
  epsx=1.0
  epsz=1.0
+! vidrio
+ epsx(:,75:)=1.5**2
+ epsz(:,75:)=1.5**2
  end subroutine build_physical_space
 
  subroutine propagate_H
@@ -113,15 +124,15 @@ contains
  integer :: i,k
  ! these are needed...
  do k=2,nz
-  Ex(1,k)=Ex(1,k)+cz*(H(1,k)-H(1,k-1))/epsx(1,k)
+  Ex(1,k)=Ex(1,k)-cz*(H(1,k)-H(1,k-1))/epsx(1,k)
  end do
  do i=2,nx
-  Ez(i,1)=Ez(i,1)+cx*(H(i,1)-H(i,1))/epsz(i,1)
+  Ez(i,1)=Ez(i,1)+cx*(H(i,1)-H(i-1,1))/epsz(i,1)
  end do
  ! ...so that these share the loop
  do i=2,nx
   do k=2,nz
-   Ex(i,k)=Ex(i,k)+cz*(H(i,k)-H(i,k-1))/epsx(i,k)
+   Ex(i,k)=Ex(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)
    Ez(i,k)=Ez(i,k)+cx*(H(i,k)-H(i-1,k))/epsz(i,k)
   end do
  end do
@@ -167,7 +178,7 @@ end subroutine propagation_cycle
 
 subroutine dump_out
 implicit none
-real :: xran,yran,tol,eex,eez,edx,edz
+real :: xran,yran,tol,eex,eez,edx,edz,check
 integer :: iran,kran,counter
 integer :: i,k
  counter=0
@@ -190,13 +201,19 @@ integer :: i,k
 !  endif
 !  if(counter.ge.nfield)exit
 ! end do
-do i=1,nx,1
- do k=1,nz,1
-   edx=(Ex(i,k+1)+Ex(i,k))/2
-   edz=(Ez(i+1,k)+Ez(i,k))/2
-   write(12,*)i,k,edx,edz
+ check=0
+do k=1,nz,1
+ do i=1,nx,1
+!   edx=(Ex(i,k+1)+Ex(i,k))/2
+!   edz=(Ez(i+1,k)+Ez(i,k))/2
+   edx=Ex(i,k)
+   edz=Ez(i,k)
+   write(12,*)i,k,edx,edz,H(i,k)
+   check=check+edx**2+edz**2+H(i,k)**2
  end do
+ write(12,*)
 end do
+write(*,*)check
  write(12,*)
  write(12,*)
 end subroutine dump_out
