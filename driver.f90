@@ -13,20 +13,32 @@ contains
  real :: center_wavelength=138.0e-7,Np,sqrt
  integer :: i,k
  Np=center_wavelength/dx
- do i=0,nz/2-1
+ do i=0,nx/2-1
   do k=0,nz/2-1
    Ex(nx/2+i,nz/2+k)=&
-   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    Ex(nx/2+i,nz/2-k)=&
-   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    Ex(nx/2-i,nz/2+k)=&
-   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    Ex(nx/2-i,nz/2-k)=&
-   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   H(nx/2+i,nz/2+k)=&
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   H(nx/2+i,nz/2-k)=&
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   H(nx/2-i,nz/2+k)=&
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   H(nx/2-i,nz/2-k)=&
+   cos(2*pi*k/Np)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
   end do
  end do
  end subroutine impose_initial_conditions
@@ -92,7 +104,7 @@ contains
  subroutine read_default_values
  implicit none
   nx=128
-  nz=128
+  nz=1024
   dx=5e-7
   dz=dx
  end subroutine read_default_values
