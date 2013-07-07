@@ -7,6 +7,32 @@ real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
                      epsx(:,:),epsz(:,:)
 
 contains
+
+ subroutine impose_initial_conditions
+ implicit none
+ real :: center_wavelength=138.0e-7,Np,sqrt
+ integer :: i,k
+ Np=center_wavelength/dx
+ write(*,*)'Np',Np
+ do i=0,nz/2
+  do k=0,nz/2
+   Ex(nx/2+i,nz/2+k)=&
+   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   Ex(nx/2+i,nz/2-k)=&
+   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   Ex(nx/2-i,nz/2+k)=&
+   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+   Ex(nx/2-i,nz/2-k)=&
+   (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
+   exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
+
+  end do
+ end do
+ end subroutine impose_initial_conditions
+
  integer function read_integer(k,variable)
  implicit none
  integer :: k, variable
@@ -26,22 +52,6 @@ contains
   read_real=k+1
  end function read_real
 
- subroutine impose_initial_conditions
- implicit none
- real :: wavelength=138.0e-7, width=1.0e-4, length=0.5e-4
- integer :: i,k,imax,kmax
- imax=width/dx
- kmax=length/dz
- do i=0,20
-  do k=0,20
-   Ex(nx/2+i,nz/2+k)=exp(-(i**2+k**2)/12.)
-   Ex(nx/2+i,nz/2-k)=exp(-(i**2+k**2)/12.)
-   Ex(nx/2-i,nz/2+k)=exp(-(i**2+k**2)/12.)
-   Ex(nx/2-i,nz/2-k)=exp(-(i**2+k**2)/12.)
-  end do
- end do
- end subroutine impose_initial_conditions
-
  subroutine randomize_randomness
  implicit none
  integer :: M=2,date_time(8),time_seed(2)
@@ -56,7 +66,7 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=960
+  nstep=360
   nwrite=16
   nfield=2400
   if(command_argument_count().eq.0)then
@@ -83,8 +93,8 @@ contains
 
  subroutine read_default_values
  implicit none
-  nx=100
-  nz=100
+  nx=40
+  nz=40
   dx=5e-7
   dz=dx
  end subroutine read_default_values
@@ -129,7 +139,7 @@ contains
  do i=2,nx
   Ez(i,1)=Ez(i,1)+cx*(H(i,1)-H(i-1,1))/epsz(i,1)
  end do
- ! ...so that these share the loop
+ ! ...so that these share the loop...
  do i=2,nx
   do k=2,nz
    Ex(i,k)=Ex(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)
@@ -151,15 +161,20 @@ implicit none
 
  call welcome_message
  call initialize_and_read_parameters
+write(*,*)'d1'
  call build_physical_space
+write(*,*)'d2'
  call impose_initial_conditions
+write(*,*)'d3'
  call propagation_cycle
-
+write(*,*)'d4'
 contains
 subroutine propagation_cycle
 implicit none
 integer :: i,cont
- open(unit=12,file='E.dat')
+ open(unit=12,file='Ex.dat')
+ open(unit=13,file='Ez.dat')
+ open(unit=14,file='H.dat')
  call randomize_randomness
  call dump_out
  cont=1
@@ -174,6 +189,8 @@ integer :: i,cont
   endif
  end do
  close(12)
+ close(13)
+ close(14)
 end subroutine propagation_cycle
 
 subroutine dump_out
@@ -201,20 +218,31 @@ integer :: i,k
 !  endif
 !  if(counter.ge.nfield)exit
 ! end do
- check=0
-do k=1,nz,1
- do i=1,nx,1
-!   edx=(Ex(i,k+1)+Ex(i,k))/2
-!   edz=(Ez(i+1,k)+Ez(i,k))/2
+do k=1,nz+1
+ do i=1,nx
    edx=Ex(i,k)
-   edz=Ez(i,k)
-   write(12,*)i,k,edx,edz,H(i,k)
-   check=check+edx**2+edz**2+H(i,k)**2
+   write(12,*)(i+0.5)*dx,k*dx,edx
  end do
  write(12,*)
 end do
-write(*,*)check
  write(12,*)
  write(12,*)
+do k=1,nz
+ do i=1,nx+1
+   edz=Ez(i,k)
+   write(13,*)i*dx,(k+0.5)*dx,edz
+ end do
+ write(13,*)
+end do
+ write(13,*)
+ write(13,*)
+do k=1,nz
+ do i=1,nx
+   write(14,*)i*dx,k*dx,H(i,k)
+ end do
+ write(14,*)
+end do
+ write(14,*)
+ write(14,*)
 end subroutine dump_out
 end program fdtd
