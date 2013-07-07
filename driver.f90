@@ -13,9 +13,8 @@ contains
  real :: center_wavelength=138.0e-7,Np,sqrt
  integer :: i,k
  Np=center_wavelength/dx
- write(*,*)'Np',Np
- do i=0,nz/2
-  do k=0,nz/2
+ do i=0,nz/2-1
+  do k=0,nz/2-1
    Ex(nx/2+i,nz/2+k)=&
    (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
@@ -28,7 +27,6 @@ contains
    Ex(nx/2-i,nz/2-k)=&
    (1-2*pi**2*(sqrt(i**2.+k**2.)/Np)**2)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/Np)**2)
-
   end do
  end do
  end subroutine impose_initial_conditions
@@ -66,9 +64,9 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=360
-  nwrite=16
-  nfield=2400
+  nstep=600
+  nwrite=120
+  nfield=512
   if(command_argument_count().eq.0)then
    call read_default_values
   else
@@ -93,8 +91,8 @@ contains
 
  subroutine read_default_values
  implicit none
-  nx=40
-  nz=40
+  nx=128
+  nz=128
   dx=5e-7
   dz=dx
  end subroutine read_default_values
@@ -114,8 +112,8 @@ contains
  epsx=1.0
  epsz=1.0
 ! vidrio
- epsx(:,75:)=1.5**2
- epsz(:,75:)=1.5**2
+! epsx(:,75:)=3.5**2
+! epsz(:,75:)=3.5**2
  end subroutine build_physical_space
 
  subroutine propagate_H
@@ -161,13 +159,9 @@ implicit none
 
  call welcome_message
  call initialize_and_read_parameters
-write(*,*)'d1'
  call build_physical_space
-write(*,*)'d2'
  call impose_initial_conditions
-write(*,*)'d3'
  call propagation_cycle
-write(*,*)'d4'
 contains
 subroutine propagation_cycle
 implicit none
@@ -175,6 +169,7 @@ integer :: i,cont
  open(unit=12,file='Ex.dat')
  open(unit=13,file='Ez.dat')
  open(unit=14,file='H.dat')
+ open(unit=20,file='Evec.dat')
  call randomize_randomness
  call dump_out
  cont=1
@@ -191,33 +186,37 @@ integer :: i,cont
  close(12)
  close(13)
  close(14)
+ close(20)
 end subroutine propagation_cycle
 
 subroutine dump_out
 implicit none
-real :: xran,yran,tol,eex,eez,edx,edz,check
+real :: xran,yran,tol,eex,eez,edx,edz,check,norm
 integer :: iran,kran,counter
 integer :: i,k
  counter=0
-! do
-!  call random_number(xran)
-!  call random_number(yran)
-!  iran=ceiling(xran*nx)
-!  kran=ceiling(yran*nz)
-!  tol=4*epsilon(xran)
+ do
+  call random_number(xran)
+  call random_number(yran)
+  iran=ceiling(xran*nx)
+  kran=ceiling(yran*nz)
+  tol=2*epsilon(xran)
 !  if( abs(H(iran,kran)).ge.tol )then
-!  if( (abs(Ex(iran,kran)).ge.tol).or.&
-!      (abs(Ez(iran,kran)).ge.tol) )then
+  if( (abs(Ex(iran,kran)).ge.tol).or.&
+      (abs(Ez(iran,kran)).ge.tol) )then
 !write(*,*)'db',counter,iran,kran,Ex(iran,kran)
-!   eex=iran*dx
-!   eez=kran*dz
-!   edx=(Ex(iran,kran+1)+Ex(iran,kran))/2
-!   edz=(Ez(iran+1,kran)+Ez(iran,kran))/2
-!   write(12,*)eex,eez,4*edx*dx,4*edz*dz
-!   counter=counter+1
-!  endif
-!  if(counter.ge.nfield)exit
-! end do
+   eex=iran*dx
+   eez=kran*dz
+   edx=(Ex(iran,kran+1)+Ex(iran,kran))/2
+   edz=(Ez(iran+1,kran)+Ez(iran,kran))/2
+   norm=sqrt(edx**2.+edz**2.)
+   write(20,*)eex,eez,edx*dx,edz*dz
+   counter=counter+1
+  endif
+  if(counter.ge.nfield)exit
+ end do
+ write(20,*)
+ write(20,*)
 do k=1,nz+1
  do i=1,nx
    edx=Ex(i,k)
