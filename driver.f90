@@ -1,6 +1,7 @@
 module engine
 real :: cz,cx,dx,dz,dt,c,pi
 parameter (c=29979245800,pi=4.0*atan(1.0))
+!parameter (c=1,pi=4.0*atan(1.0))
 integer :: nstep,nwrite,nx,nz,nfield
 real :: center_frequency
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
@@ -28,17 +29,17 @@ contains
    cos(2*pi*k/Np)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    H(nx/2+i,nz/2+k)=&
-   cos(2*pi*k/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
+   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
    H(nx/2+i,nz/2-k)=&
-   cos(2*pi*k/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
+   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
    H(nx/2-i,nz/2+k)=&
-   cos(2*pi*k/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
+   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
    H(nx/2-i,nz/2-k)=&
-   cos(2*pi*k/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
+   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
+   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
   end do
  end do
  end subroutine impose_initial_conditions
@@ -76,9 +77,9 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=600
-  nwrite=120
-  nfield=512
+  nstep=1000
+  nwrite=12
+  nfield=5120
   if(command_argument_count().eq.0)then
    call read_default_values
   else
@@ -86,7 +87,7 @@ contains
   endif
   call allocate_fields
   dt=min(dx,dz)
-  dt=dx/(10*c)
+  dt=dx/(3*c)
   cx=c*dt/dx
   cz=c*dt/dz
  end subroutine initialize_and_read_parameters
@@ -103,8 +104,8 @@ contains
 
  subroutine read_default_values
  implicit none
-  nx=128
-  nz=1024
+  nx=256+3
+  nz=256+3
   dx=5e-7
   dz=dx
  end subroutine read_default_values
@@ -124,8 +125,8 @@ contains
  epsx=1.0
  epsz=1.0
 ! vidrio
-! epsx(:,75:)=3.5**2
-! epsz(:,75:)=3.5**2
+ epsx(:,230:)=3.5**2
+ epsz(:,230:)=3.5**2
  end subroutine build_physical_space
 
  subroutine propagate_H
@@ -204,28 +205,43 @@ end subroutine propagation_cycle
 subroutine dump_out
 implicit none
 real :: xran,yran,tol,eex,eez,edx,edz,check,norm
-integer :: iran,kran,counter
+!integer :: iran,kran,counter
 integer :: i,k
- counter=0
- do
-  call random_number(xran)
-  call random_number(yran)
-  iran=ceiling(xran*nx)
-  kran=ceiling(yran*nz)
-  tol=2*epsilon(xran)
+! counter=0
+! do
+!  call random_number(xran)
+!  call random_number(yran)
+!  iran=ceiling(xran*nx)
+!  kran=ceiling(yran*nz)
+!  tol=2*epsilon(xran)
 !  if( abs(H(iran,kran)).ge.tol )then
-  if( (abs(Ex(iran,kran)).ge.tol).or.&
-      (abs(Ez(iran,kran)).ge.tol) )then
+!  if( (abs(Ex(iran,kran)).ge.tol).or.&
+!      (abs(Ez(iran,kran)).ge.tol) )then
 !write(*,*)'db',counter,iran,kran,Ex(iran,kran)
-   eex=iran*dx
-   eez=kran*dz
-   edx=(Ex(iran,kran+1)+Ex(iran,kran))/2
-   edz=(Ez(iran+1,kran)+Ez(iran,kran))/2
+!   eex=iran*dx
+!   eez=kran*dz
+!   edx=(Ex(iran,kran+1)+Ex(iran,kran))/2
+!   edz=(Ez(iran+1,kran)+Ez(iran,kran))/2
+!   norm=sqrt(edx**2.+edz**2.)
+!   write(20,*)eex,eez,edx*dx,edz*dz
+!   counter=counter+1
+!  endif
+!  if(counter.ge.nfield)exit
+! end do
+ do k=0,nz+1,4
+  do i=0,nx+1,4
+   if( (i.eq.0.or.i.eq.(nx+1))&
+   .or.(k.eq.0.or.k.eq.(nz+1)) )then
+    edx=0
+    edz=0
+   else
+    edx=(Ex(i-1,k)+Ex(i-1,k-1))/2.
+    edz=(Ez(i,k-1)+Ez(i-1,k-1))/2.
+   endif
    norm=sqrt(edx**2.+edz**2.)
-   write(20,*)eex,eez,edx*dx,edz*dz
-   counter=counter+1
-  endif
-  if(counter.ge.nfield)exit
+   write(20,*)i*dx,k*dx,edx*dx,edz*dx
+  end do
+  write(20,*)
  end do
  write(20,*)
  write(20,*)
