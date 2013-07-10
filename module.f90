@@ -1,11 +1,13 @@
 module engine
-real :: cz,cx,dx,dz,dt,c,pi
+real :: cz,cx,dx,dz,dt,c,pi,czabc,cxabc
 parameter (c=29979245800,pi=4.0*atan(1.0))
 !parameter (c=1,pi=4.0*atan(1.0))
 integer :: nstep,nwrite,nx,nz,nfield
 real :: center_frequency
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
-                     epsx(:,:),epsz(:,:)
+                     epsx(:,:),epsz(:,:),&
+                     Exsav1(:),Ezsav1(:),&
+                     Exsav2(:),Ezsav2(:)
 
 contains
  subroutine read_default_values
@@ -23,29 +25,29 @@ contains
  do i=0,nx/2-1
   do k=0,nz/2-1
    Ex(nx/2+i,nz/2+k)=&
-   cos(2*pi*k/Np)*&
+   cos(2*pi*(k+i)/Np)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    Ex(nx/2+i,nz/2-k)=&
-   cos(2*pi*k/Np)*&
+   cos(2*pi*(k+i)/Np)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    Ex(nx/2-i,nz/2+k)=&
-   cos(2*pi*k/Np)*&
+   cos(2*pi*(k+i)/Np)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
    Ex(nx/2-i,nz/2-k)=&
-   cos(2*pi*k/Np)*&
+   cos(2*pi*(k+i)/Np)*&
    exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
-   H(nx/2+i,nz/2+k)=&
-   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
-   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-   H(nx/2+i,nz/2-k)=&
-   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
-   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-   H(nx/2-i,nz/2+k)=&
-   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
-   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-   H(nx/2-i,nz/2-k)=&
-   cos(2*pi*(k+dz/2)/Np+c*dt/2)*&
-   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
+!   H(nx/2+i,nz/2+k)=&
+!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
+!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
+!   H(nx/2+i,nz/2-k)=&
+!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
+!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
+!   H(nx/2-i,nz/2+k)=&
+!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
+!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
+!   H(nx/2-i,nz/2-k)=&
+!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
+!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
   end do
  end do
  end subroutine impose_initial_conditions
@@ -83,8 +85,8 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=240
-  nwrite=24
+  nstep=64*6
+  nwrite=4
   nfield=5120
   if(command_argument_count().eq.0)then
    call read_default_values
@@ -93,15 +95,21 @@ contains
   endif
   call allocate_fields
   dt=min(dx,dz)
-  dt=dx/(10*c)
+  dt=dx/(sqrt(3.)*c)
   cx=c*dt/dx
   cz=c*dt/dz
+  czabc=(c*dt-dz)/(c*dt+dz)
+  cxabc=(c*dt-dx)/(c*dt+dx)
  end subroutine initialize_and_read_parameters
 
  subroutine allocate_fields
  implicit none
   allocate(Ex(nx,nz+1))
+  allocate(Exsav1(nx))
+  allocate(Exsav2(nx))
   allocate(Ez(nx+1,nz))
+  allocate(Ezsav1(nz))
+  allocate(Ezsav2(nz))
   allocate(epsx(nx,nz+1))
   allocate(epsz(nx+1,nz))
   allocate(H(nx,nz))
@@ -123,8 +131,8 @@ contains
  epsx=1.0
  epsz=1.0
 ! vidrio
-! epsx(:,230:)=3.5**2
-! epsz(:,230:)=3.5**2
+! epsx(15:25,:)=3.5**2
+! epsz(15:25,:)=3.5**2
  end subroutine build_physical_space
 
  subroutine propagate_H
@@ -141,6 +149,10 @@ contains
  subroutine propagate_E
  implicit none
  integer :: i,k
+ Ezsav1(:)=Ez(2,:)
+ Ezsav2(:)=EZ(nx,:)
+ Exsav1(:)=Ex(:,2)
+ Exsav2(:)=Ex(:,nz)
  ! these are needed...
  do k=2,nz
   Ex(1,k)=Ex(1,k)-cz*(H(1,k)-H(1,k-1))/epsx(1,k)
@@ -154,6 +166,15 @@ contains
    Ex(i,k)=Ex(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)
    Ez(i,k)=Ez(i,k)+cx*(H(i,k)-H(i-1,k))/epsz(i,k)
   end do
+ end do
+ ! Absorbing boundary conditions Mur, first order
+ do k=1,nz
+  Ez(1,k)=Ezsav1(k)+czabc*(Ez(2,k)-Ez(1,k))
+  Ez(nx+1,k)=Ezsav2(k)+czabc*(Ez(nx,k)-Ez(nx+1,k))
+ end do
+ do i=1,nx
+  Ex(i,1)=Exsav1(i)+cxabc*(Ex(i,2)-Ex(i,1))
+  Ex(i,nz+1)=Exsav2(i)+cxabc*(Ex(i,nz)-Ex(i,nz+1))
  end do
  end subroutine propagate_E
 
