@@ -1,55 +1,66 @@
 module engine
-real :: cz,cx,dx,dz,dt,c,pi,czabc,cxabc
+real :: cz,cx,dx,dz,dt,c,pi,czabc,cxabc,s
 parameter (c=29979245800,pi=4.0*atan(1.0))
 !parameter (c=1,pi=4.0*atan(1.0))
-integer :: nstep,nwrite,nx,nz,nfield
-real :: center_frequency
+integer :: nstep,nwrite,snapshots,nx,nz,nfield
+!THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON PLOT
+parameter (snapshots=264,nwrite=24)
+real :: wavelength=50.0e-7,packetwidth=4.0,packetlength=2.0
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
                      epsx(:,:),epsz(:,:),&
+                     psix(:,:),psiz(:,:),&
                      Exsav1(:),Ezsav1(:),&
                      Exsav2(:),Ezsav2(:)
 
 contains
  subroutine read_default_values
  implicit none
-  nx=196+3
-  nz=196+3
+  nx=260+3
+  nz=260+3
   dx=5e-7
   dz=dx
+  s=0.1!parametro de estabilidad
  end subroutine read_default_values
+
+ subroutine gaussian_packet(center_x,center_z,angle,wln,inwidth,inlength)
+ implicit none
+ integer, intent(in) :: center_x,center_z
+ real, intent (in) :: angle, wln, inwidth, inlength
+ real :: width, length, denomx, denomz
+ real :: Np, wavevec(2),unit_vec(2),rex(2),rez(2),rh(2)
+ integer :: i, k
+  width=wln*inwidth
+  length=wln*inlength
+  Np=wln/dx
+  wavevec(1)=2.0*pi*cos(angle)/wln
+  wavevec(2)=2.0*pi*sin(angle)/wln
+  denomx  = (width*cos(angle))**2+(length*sin(angle))**2
+  denomz  = (width*sin(angle))**2+(length*cos(angle))**2
+  do i=1,nx
+   do k=1,nz
+    rex(1)=i*dx
+    rex(2)=(k+0.5)*dz
+    rez(1)=(i+0.5)*dx
+    rez(2)=k*dz
+    rh(1)=(i+0.5+0.5*(1.0-s))*dx
+    rh(2)=(k+0.5+0.5*(1.0-s))*dz
+    Ex(i,k)= sin(angle)*cos(dot_product(wavevec,rex))*&
+       exp(-(dx*center_x-rex(1))**2/denomx)*&
+       exp(-(dz*center_z-rex(2))**2/denomz)
+    Ez(i,k)=-cos(angle)*cos(dot_product(wavevec,rez))*&
+       exp(-(dx*center_x-rez(1))**2/denomx)*&
+       exp(-(dz*center_z-rez(2))**2/denomz)
+    H(i,k) = cos(dot_product(wavevec,rh))*&
+       exp(-(dx*center_x-rh(1))**2/denomx)*&
+       exp(-(dz*center_z-rh(2))**2/denomz)
+   end do
+  end do
+ end subroutine gaussian_packet
+
  subroutine impose_initial_conditions
  implicit none
- real :: center_wavelength=138.0e-7,Np,sqrt
- integer :: i,k
- Np=center_wavelength/dx
- do i=0,nx/2-1
-  do k=0,nz/2-1
-   Ex(nx/2+i,nz/2+k)=&
-   cos(2*pi*(k+i)/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
-   Ex(nx/2+i,nz/2-k)=&
-   cos(2*pi*(k+i)/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
-   Ex(nx/2-i,nz/2+k)=&
-   cos(2*pi*(k+i)/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
-   Ex(nx/2-i,nz/2-k)=&
-   cos(2*pi*(k+i)/Np)*&
-   exp(-pi**2*(sqrt(i**2.+k**2.)/(4*Np))**2)
-!   H(nx/2+i,nz/2+k)=&
-!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
-!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-!   H(nx/2+i,nz/2-k)=&
-!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
-!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-!   H(nx/2-i,nz/2+k)=&
-!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
-!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-!   H(nx/2-i,nz/2-k)=&
-!   cos(2*pi*(i+dx/2)/Np+c*dt/2)*&
-!   exp(-pi**2*((sqrt(i**2.+(k+dz/2)**2.)+c*dt/2)/(4*Np))**2)
-  end do
- end do
+  call gaussian_packet(nint(nx/3.),nint(nx/3.),pi/4.,&
+                         wavelength,packetwidth,packetlength)
  end subroutine impose_initial_conditions
 
  integer function read_integer(k,variable)
@@ -85,8 +96,7 @@ contains
 
  subroutine initialize_and_read_parameters
  implicit none
-  nstep=64*6
-  nwrite=4
+  nstep=snapshots*nwrite
   nfield=5120
   if(command_argument_count().eq.0)then
    call read_default_values
@@ -95,11 +105,13 @@ contains
   endif
   call allocate_fields
   dt=min(dx,dz)
-  dt=dx/(sqrt(3.)*c)
+  dt=s*dt/c
   cx=c*dt/dx
   cz=c*dt/dz
   czabc=(c*dt-dz)/(c*dt+dz)
   cxabc=(c*dt-dx)/(c*dt+dx)
+  write(*,*)'delta t: ', dt
+  write(*,*)'total simulation time: ', dt*nwrite*snapshots
  end subroutine initialize_and_read_parameters
 
  subroutine allocate_fields
@@ -133,6 +145,15 @@ contains
 ! vidrio
 ! epsx(15:25,:)=3.5**2
 ! epsz(15:25,:)=3.5**2
+ do i=160,220
+  do k=160,220
+!   epsx(i,k)=( 3*(100-i)/70. + 1  )**2.
+!   epsx(i,k)=((2.-(i-30.)/70.)*1.55)**2.
+!   epsz(i,k)=((2.-(i-30.)/70.)*1.55)**2.
+   epsx(i,k)=(1.55)**2.
+   epsz(i,k)=(1.55)**2.
+  end do
+ end do
  end subroutine build_physical_space
 
  subroutine propagate_H
@@ -182,5 +203,6 @@ contains
  implicit none
  write(*,*)'Welcome to the Transverse-Magnetic solver'
  write(*,*)'Private release, Daniel Jimenez (2013)'
+ write(*,*)'Total number of steps ',nwrite*snapshots
  end subroutine welcome_message
 end module engine
