@@ -1,6 +1,6 @@
 set term pngcairo size 800,480
 #THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON FDTD
-snapshots=264
+snapshots=240
 
 green = 1.0/3.0
 blue = 2.0/3.0

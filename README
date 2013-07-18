@@ -1,0 +1,20 @@
+Numerical solution of Maxwell's equations by FDTD in 2D for H-polarized fields
+By Daniel Jimenez
+
+ + runme.sh (defines fps)
+
+ This shell script runs the compiler, executes the command, plots the output files and generates the animated movies at a set framerate.
+
+ + fdtd.f90
+
+ This fortran code contains the main program as well as the principal routines regarding the numerical solution. Unit numbers & filenames, write format for datafiles and propagation routines can be found here.
+
+ + module.f90 (snapshots must match plot.p)
+
+ This fortran code is the module where all the low level operations are performed. Equations for setting initial conditions, allocating variables, defining parameters, command line interface and randomization can be found here.
+
+ + plot.p (snapshots must match module.f90)
+
+ This gnuplot script uses a loop to generate the image files from which videos will be rendered.
+
+Check the git log for the dates.
