@@ -11,10 +11,9 @@ contains
 subroutine propagation_cycle
 implicit none
 integer :: i,cont
- open(unit=12,file='Ex.dat')
- open(unit=13,file='Ez.dat')
- open(unit=14,file='H.dat')
- open(unit=20,file='Evec.dat')
+ open(unit=12,file='tmp/E.dat')
+ open(unit=14,file='tmp/H.dat')
+ open(unit=20,file='tmp/Evec.dat')
  call randomize_randomness
  call dump_out(0)
  cont=1
@@ -78,26 +77,24 @@ integer :: i,k,j
  end do
  write(20,*)
  write(20,*)
-do k=1,nz+1
- do i=1,nx
-   edx=Ex(i,k)
-   write(12,*)(i+0.5)*dx,k*dx,edx
+do k=0,nz+1,4
+ do i=0,nx+1,4
+  if( (i.eq.0.or.i.eq.(nx+1))&
+  .or.(k.eq.0.or.k.eq.(nz+1)) )then
+   edx=0
+   edz=0
+  else
+   edx=(Ex(i-1,k)+Ex(i-1,k-1))/2.
+   edx=(Ez(i,k-1)+Ez(i-1,k-1))/2.
+  endif
+  write(12,*)i*dx,k*dx,(edx**2+edz**2)**0.5
  end do
  write(12,*)
 end do
  write(12,*)
  write(12,*)
-do k=1,nz
- do i=1,nx+1
-   edz=Ez(i,k)
-   write(13,*)i*dx,(k+0.5)*dx,edz
- end do
- write(13,*)
-end do
- write(13,*)
- write(13,*)
-do k=1,nz
- do i=1,nx
+do k=1,nz,2
+ do i=1,nx,2
    write(14,*)i*dx,k*dx,H(i,k)
  end do
  write(14,*)

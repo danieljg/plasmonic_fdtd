@@ -7,7 +7,7 @@ By Daniel Jimenez
 
  + fdtd.f90
 
- This fortran code contains the main program as well as the principal routines regarding the numerical solution. Unit numbers & filenames, write format for datafiles and propagation routines can be found here.
+ This fortran code contains the main program as well as the principal routines regarding the numerical solution. Unit numbers & filenames, write format for datafiles and propagation routines can be found here. Files are to be stored in a temporary filesystem to avoid disk latency.
 
  + module.f90 (snapshots must match plot.p)
 

@@ -4,34 +4,32 @@ parameter (c=29979245800,pi=4.0*atan(1.0))
 !parameter (c=1,pi=4.0*atan(1.0))
 integer :: nstep,nwrite,snapshots,nx,nz,nfield,material_limits(4)
 !THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON PLOT
-parameter (snapshots=240,nwrite=8)
-logical :: metal=.false.
+parameter (snapshots=240,nwrite=13)
 real :: wavelength,packetwidth,packetlength,plasma_freq,drude_gamma,&
         drude_sigma,xi_zero,delta_xi,egamma,inverse_k
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
                      epsx(:,:),epsz(:,:),&
                      psix(:,:),psiz(:,:),&
-                     Exsav(:,:),Ezsav(:,:),&
                      Exsav1(:),Ezsav1(:),&
                      Exsav2(:),Ezsav2(:)
 
 contains
  subroutine read_default_values
  implicit none
-  nx=320+3   !puntos en x
-  nz=320+3   !puntos en z
-  dx=5e-7    !espaciado en x
+  nx=360+3   !puntos en x
+  nz=300+3   !puntos en z
+  dx=10e-7    !espaciado en x
   dz=dx      !espaciado en z
-  s=0.1      !parametro de estabilidad
-  wavelength=138e-7  !longitud de onda central del paquete incidente
-  packetwidth=4.0    !ancho del paquete (en longitudes de onda)
-  packetlength=1.0   !largo del paquete 
+  s=0.2      !parametro de estabilidad
+  wavelength=400e-7*0.707  !longitud de onda central del paquete incidente
+  packetwidth=3.0    !ancho del paquete (en longitudes de onda)
+  packetlength=2.0   !largo del paquete 
   plasma_freq=1.36e16!frecuencia angular de plasma
   drude_gamma=3.6e13 !frecuencia de colisiones
-  material_limits(1)=160
-  material_limits(2)=220
-  material_limits(3)=40
-  material_limits(4)=220
+  material_limits(1)=220
+  material_limits(2)=280
+  material_limits(3)=100
+  material_limits(4)=200
  end subroutine read_default_values
 
  subroutine gaussian_packet(center_x,center_z,angle,wln,inwidth,inlength)
@@ -71,7 +69,7 @@ contains
 
  subroutine impose_initial_conditions
  implicit none
-  call gaussian_packet(nint(nx/3.),nint(nx/3.),0.,&
+  call gaussian_packet(nint(nx/3.),nint(nz/2.),0.,&
                          wavelength,packetwidth,packetlength)
  end subroutine impose_initial_conditions
 
@@ -178,19 +176,30 @@ contains
    epsz(i,k)=(1.55)**2.
   end do
  end do 
- end subroutine
+ end subroutine slab_of_glass
 
  subroutine slab_of_metal(imin,imax,kmin,kmax)
  implicit none
  integer, intent(in) :: imin,imax,kmin,kmax
  allocate(psix(imin:imax,kmin:kmax))
  allocate(psiz(imin:imax,kmin:kmax))
- allocate(Exsav(imin:imax,kmin:kmax))
- allocate(Ezsav(imin:imax,kmin:kmax))
  psix(:,:)=0.
  psiz(:,:)=0.
- metal=.true.
- end subroutine
+ end subroutine slab_of_metal
+
+ function inside_metal(i,k)
+ implicit none
+ logical :: inside_metal
+ integer, intent(in) :: i,k
+  if(  ((i.gt.material_limits(1)).and.(i.lt.material_limits(2)))&
+  .and.((k.gt.material_limits(3)).and.(k.lt.material_limits(4))) )then
+  inside_metal=.true.
+  else
+  inside_metal=.false.
+  endif
+  ! hexagono!!!!!!!
+  
+ end function inside_metal
 
  subroutine propagate_H
  implicit none
@@ -210,17 +219,6 @@ contains
  Ezsav2(:)=EZ(nx,:)
  Exsav1(:)=Ex(:,2)
  Exsav2(:)=Ex(:,nz)
- ! save values for metal propagation
- if(metal.eq..true.)then
-  do i=material_limits(1),material_limits(2)
-   do k=material_limits(3),material_limits(4)
-    Exsav(i,k)=Ex(i,k)
-    Ezsav(i,k)=Ez(i,k)
-    psix(i,k)=Ex(i,k)*delta_xi+egamma*psix(i,k)
-    psiz(i,k)=Ez(i,k)*delta_xi+egamma*psiz(i,k)
-   end do
-  end do
- end if
  ! these are needed...
  do k=2,nz
   Ex(1,k)=Ex(1,k)-cz*(H(1,k)-H(1,k-1))/epsx(1,k)
@@ -231,19 +229,17 @@ contains
  ! ...so that these share the loop...
  do i=2,nx
   do k=2,nz
-   Ex(i,k)=Ex(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)
-   Ez(i,k)=Ez(i,k)+cx*(H(i,k)-H(i-1,k))/epsz(i,k)
+   if(inside_metal(i,k).eq..true.)then
+    Ex(i,k)=inverse_k*(Ex(i,k)-cz*(H(i,k)-H(i,k-1))+4*pi*psix(i,k))
+    Ez(i,k)=inverse_k*(Ez(i,k)+cx*(H(i,k)-H(i-1,k))+4*pi*psiz(i,k))
+    psix(i,k)=Ex(i,k)*delta_xi+egamma*psix(i,k)
+    psiz(i,k)=Ez(i,k)*delta_xi+egamma*psix(i,k)
+   else
+    Ex(i,k)=Ex(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)
+    Ez(i,k)=Ez(i,k)+cx*(H(i,k)-H(i-1,k))/epsz(i,k)
+   endif
   end do
  end do
- ! recompute metal values
- if(metal.eq..true.)then
-  do i=material_limits(1),material_limits(2)
-   do k=material_limits(3),material_limits(4)
-    Ex(i,k)=inverse_k*(Exsav(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)+4*pi*psix(i,k))
-    Ez(i,k)=inverse_k*(Ezsav(i,k)+cx*(H(i,k)-H(i-1,k))/epsz(i,k)+4*pi*psiz(i,k))
-   end do
-  end do
- end if
  ! Absorbing boundary conditions Mur, first order
  do k=1,nz
   Ez(1,k)=Ezsav1(k)+czabc*(Ez(2,k)-Ez(1,k))
