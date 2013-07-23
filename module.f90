@@ -4,7 +4,7 @@ parameter (c=29979245800,pi=4.0*atan(1.0))
 !parameter (c=1,pi=4.0*atan(1.0))
 integer :: nstep,nwrite,snapshots,nx,nz,nfield,material_limits(4)
 !THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON PLOT
-parameter (snapshots=16,nwrite=6*64)
+parameter (snapshots=16,nwrite=3*64)
 real :: wavelength,packetwidth,packetlength,plasma_freq,drude_gamma,&
         drude_sigma,xi_zero,delta_xi,egamma,inverse_k,E_o
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
@@ -18,20 +18,20 @@ contains
  implicit none
   nx=340   !puntos en x
   nz=300   !puntos en z
-  dx=2e-7 !espaciado en x
-  dz=dx      !espaciado en z
+  dx=2e-7  !espaciado en x
+  dz=dx    !espaciado en z
   s=0.2    !parametro de estabilidad
   wavelength=8e15
   wavelength=3.0e10/wavelength  !longitud de onda central del paquete incidente
   packetwidth=1.5    !ancho del paquete (en longitudes de onda)
   packetlength=1.5   !largo del paquete
-  E_o=10.0            !amplitud del paquete
-  plasma_freq=1.63e16 !frecuencia angular de plasma
+  E_o=10.0           !amplitud del paquete
+  plasma_freq=1.63e16!frecuencia angular de plasma
   drude_gamma=4.1e13 !frecuencia de colisiones
-  material_limits(1)=300
-  material_limits(2)=300
-  material_limits(3)=40
-  material_limits(4)=260
+  material_limits(1)=nx-100
+  material_limits(2)=nx-3
+  material_limits(3)=3
+  material_limits(4)=nz-3
  end subroutine read_default_values
 
  subroutine gaussian_packet(center_x,center_z,angle,wln,inwidth,inlength)

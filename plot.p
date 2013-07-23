@@ -1,6 +1,4 @@
 set term png enhanced size 580,400
-#THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON FDTD
-#snapshots=8
 
 red = 1.0/20.0
 yellow = 1.0/6.0
