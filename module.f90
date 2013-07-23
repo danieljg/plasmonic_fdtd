@@ -4,9 +4,9 @@ parameter (c=29979245800,pi=4.0*atan(1.0))
 !parameter (c=1,pi=4.0*atan(1.0))
 integer :: nstep,nwrite,snapshots,nx,nz,nfield,material_limits(4)
 !THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON PLOT
-parameter (snapshots=240,nwrite=13)
+parameter (snapshots=16,nwrite=6*64)
 real :: wavelength,packetwidth,packetlength,plasma_freq,drude_gamma,&
-        drude_sigma,xi_zero,delta_xi,egamma,inverse_k
+        drude_sigma,xi_zero,delta_xi,egamma,inverse_k,E_o
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
                      epsx(:,:),epsz(:,:),&
                      psix(:,:),psiz(:,:),&
@@ -16,20 +16,22 @@ real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
 contains
  subroutine read_default_values
  implicit none
-  nx=360+3   !puntos en x
-  nz=300+3   !puntos en z
-  dx=10e-7    !espaciado en x
+  nx=340   !puntos en x
+  nz=300   !puntos en z
+  dx=2e-7 !espaciado en x
   dz=dx      !espaciado en z
-  s=0.2      !parametro de estabilidad
-  wavelength=400e-7*0.707  !longitud de onda central del paquete incidente
-  packetwidth=3.0    !ancho del paquete (en longitudes de onda)
-  packetlength=2.0   !largo del paquete 
-  plasma_freq=1.36e16!frecuencia angular de plasma
-  drude_gamma=3.6e13 !frecuencia de colisiones
-  material_limits(1)=220
-  material_limits(2)=280
-  material_limits(3)=100
-  material_limits(4)=200
+  s=0.2    !parametro de estabilidad
+  wavelength=8e15
+  wavelength=3.0e10/wavelength  !longitud de onda central del paquete incidente
+  packetwidth=1.5    !ancho del paquete (en longitudes de onda)
+  packetlength=1.5   !largo del paquete
+  E_o=10.0            !amplitud del paquete
+  plasma_freq=1.63e16 !frecuencia angular de plasma
+  drude_gamma=4.1e13 !frecuencia de colisiones
+  material_limits(1)=300
+  material_limits(2)=300
+  material_limits(3)=40
+  material_limits(4)=260
  end subroutine read_default_values
 
  subroutine gaussian_packet(center_x,center_z,angle,wln,inwidth,inlength)
@@ -54,13 +56,13 @@ contains
     rez(2)=k*dz
     rh(1)=(i+0.5+0.5*(1.0-s))*dx
     rh(2)=(k+0.5+0.5*(1.0-s))*dz
-    Ex(i,k)= sin(angle)*cos(dot_product(wavevec,rex))*&
+    Ex(i,k)= E_o*sin(angle)*cos(dot_product(wavevec,rex))*&
        exp(-(dx*center_x-rex(1))**2/denomx)*&
        exp(-(dz*center_z-rex(2))**2/denomz)
-    Ez(i,k)=-cos(angle)*cos(dot_product(wavevec,rez))*&
+    Ez(i,k)=-E_o*cos(angle)*cos(dot_product(wavevec,rez))*&
        exp(-(dx*center_x-rez(1))**2/denomx)*&
        exp(-(dz*center_z-rez(2))**2/denomz)
-    H(i,k) = cos(dot_product(wavevec,rh))*&
+    H(i,k) = E_o*cos(dot_product(wavevec,rh))*&
        exp(-(dx*center_x-rh(1))**2/denomx)*&
        exp(-(dz*center_z-rh(2))**2/denomz)
    end do
@@ -69,8 +71,8 @@ contains
 
  subroutine impose_initial_conditions
  implicit none
-  call gaussian_packet(nint(nx/3.),nint(nz/2.),0.,&
-                         wavelength,packetwidth,packetlength)
+ call gaussian_packet(nint(nx*3/10.),nint(nz*5/10.),0.,&
+                    wavelength,packetwidth,packetlength)
  end subroutine impose_initial_conditions
 
  integer function read_integer(k,variable)
@@ -121,13 +123,19 @@ contains
   czabc=(c*dt-dz)/(c*dt+dz)
   cxabc=(c*dt-dx)/(c*dt+dx)
   egamma=exp(-drude_gamma*dt)
-  xi_zero=-(plasma_freq/drude_gamma)**2*(1-egamma)
-  delta_xi=-(plasma_freq*(1-egamma)/drude_gamma)**2
-  drude_sigma=plasma_freq**2*drude_gamma/(4.0*pi)
-  inverse_k=1+4*pi*xi_zero+4*pi*drude_sigma*dt
+  drude_sigma=plasma_freq**2/(4.0*pi*drude_gamma)
+  xi_zero=(drude_sigma/drude_gamma)*(1-egamma)!(plasma_freq/drude_gamma)**2*(1-egamma)/(4*pi)
+  delta_xi=(drude_sigma/drude_gamma)*(1-egamma)**2!(plasma_freq*(1-egamma)/drude_gamma)**2/(4*pi)
+  inverse_k=1+4.0*pi*(xi_zero+drude_sigma*dt)
+  write(*,*)'egamma',egamma,'4pi*Xi_0',4*pi*xi_zero
+  write(*,*)'4pi*sigma*dt',4*pi*drude_sigma*dt,&
+            'k',inverse_k
   inverse_k=1.0/inverse_k
+  write(*,*)'inverse_k',inverse_k,&
+            'delta_Xi',delta_xi,'Xi_zero',xi_zero
   write(*,*)'delta t: ', dt
-  write(*,*)'total simulation time: ', dt*nwrite*snapshots
+  write(*,*)'total simulation time: ',&
+            dt*nwrite*snapshots
  end subroutine initialize_and_read_parameters
 
  subroutine allocate_fields
@@ -162,7 +170,7 @@ contains
  imax=material_limits(2)
  kmin=material_limits(3)
  kmax=material_limits(4)
- !call slab_of_glass(imin,imax,kmin,kmax)
+! call slab_of_glass(20,imin-1,20,nz-20)
  call slab_of_metal(imin,imax,kmin,kmax)
  end subroutine build_physical_space
 
@@ -172,8 +180,8 @@ contains
  integer :: i,k
  do i=imin,imax
   do k=kmin,kmax
-   epsx(i,k)=(1.55)**2.
-   epsz(i,k)=(1.55)**2.
+   epsx(i,k)=(1.75)**2.
+   epsz(i,k)=(1.75)**2.
   end do
  end do 
  end subroutine slab_of_glass
@@ -191,14 +199,13 @@ contains
  implicit none
  logical :: inside_metal
  integer, intent(in) :: i,k
-  if(  ((i.gt.material_limits(1)).and.(i.lt.material_limits(2)))&
-  .and.((k.gt.material_limits(3)).and.(k.lt.material_limits(4))) )then
+  if(  ((i.ge.material_limits(1)).and.(i.le.material_limits(2)))&
+  .and.((k.ge.material_limits(3)).and.(k.le.material_limits(4))) )then
   inside_metal=.true.
   else
   inside_metal=.false.
   endif
   ! hexagono!!!!!!!
-  
  end function inside_metal
 
  subroutine propagate_H
@@ -230,10 +237,10 @@ contains
  do i=2,nx
   do k=2,nz
    if(inside_metal(i,k).eq..true.)then
+    psix(i,k)=Ex(i,k)*delta_xi+egamma*psix(i,k)
+    psiz(i,k)=Ez(i,k)*delta_xi+egamma*psiz(i,k)
     Ex(i,k)=inverse_k*(Ex(i,k)-cz*(H(i,k)-H(i,k-1))+4*pi*psix(i,k))
     Ez(i,k)=inverse_k*(Ez(i,k)+cx*(H(i,k)-H(i-1,k))+4*pi*psiz(i,k))
-    psix(i,k)=Ex(i,k)*delta_xi+egamma*psix(i,k)
-    psiz(i,k)=Ez(i,k)*delta_xi+egamma*psix(i,k)
    else
     Ex(i,k)=Ex(i,k)-cz*(H(i,k)-H(i,k-1))/epsx(i,k)
     Ez(i,k)=Ez(i,k)+cx*(H(i,k)-H(i-1,k))/epsz(i,k)
