@@ -1,11 +1,12 @@
-set term png enhanced size 580,400
+set term png enhanced size 800,800
 
 red = 1.0/20.0
 yellow = 1.0/6.0
 green = 1.0/3.0
 blue = 2.0/3.0
 
-set size ratio -1
+#set size ratio -1
+set size ratio 0
 #set xrange [0:1.620]
 #set yrange [0:0.645]
 set xlabel 'x ({/Symbol m}m)'
@@ -33,6 +34,16 @@ outfile = sprintf('tmp/H%04.0f.png',idx)
  splot 'tmp/E.dat' u ($1*1e4):($2*1e4):($3) noti
  set output
 
+ set cbrange [0:0.001]
+ #set cbrange [0:0.018]
+ #set autoscale cb
+ set size ratio 0
+ outfile = sprintf('tmp/Psi%04.0f.png',idx)
+ set title 'Material response'
+ set output outfile
+ set xlabel 'x (nm)'
+ splot 'tmp/Psi.dat' u ($1*1e7):($2*1e4):($3) noti
+ set output
 
 #system('rm animation/*.eps')
 #system('rm animation/*.pdf')

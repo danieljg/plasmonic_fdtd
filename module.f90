@@ -4,7 +4,7 @@ parameter (c=29979245800,pi=4.0*atan(1.0))
 !parameter (c=1,pi=4.0*atan(1.0))
 integer :: nstep,nwrite,snapshots,nx,nz,nfield,material_limits(4)
 !THIS MUST MATCH WITH THE NUMBER OF SNAPSHOTS ON PLOT
-parameter (snapshots=16,nwrite=3*64)
+parameter (snapshots=240,nwrite=24)
 real :: wavelength,packetwidth,packetlength,plasma_freq,drude_gamma,&
         drude_sigma,xi_zero,delta_xi,egamma,inverse_k,E_o
 real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
@@ -12,34 +12,79 @@ real, allocatable :: Ex(:,:),Ez(:,:),H(:,:),&
                      psix(:,:),psiz(:,:),&
                      Exsav1(:),Ezsav1(:),&
                      Exsav2(:),Ezsav2(:)
+logical, allocatable :: metal_array(:,:)
 
 contains
  subroutine read_default_values
  implicit none
-  nx=340   !puntos en x
-  nz=300   !puntos en z
-  dx=2e-7  !espaciado en x
+  nx=2400-1   !puntos en x
+  nz=8000-1   !puntos en z
+  dx=5e-7  !espaciado en x
   dz=dx    !espaciado en z
-  s=0.2    !parametro de estabilidad
+  s=0.5    !parametro de estabilidad
   wavelength=8e15
-  wavelength=3.0e10/wavelength  !longitud de onda central del paquete incidente
-  packetwidth=1.5    !ancho del paquete (en longitudes de onda)
-  packetlength=1.5   !largo del paquete
-  E_o=10.0           !amplitud del paquete
-  plasma_freq=1.63e16!frecuencia angular de plasma
-  drude_gamma=4.1e13 !frecuencia de colisiones
-  material_limits(1)=nx-100
-  material_limits(2)=nx-3
-  material_limits(3)=3
-  material_limits(4)=nz-3
+  wavelength=750e-7!3.0e10/wavelength  !longitud de onda central del paquete incidente
+  packetwidth=2.0    !ancho del paquete (en longitudes de onda)
+  packetlength=12.0   !largo del paquete
+  E_o=2.0           !amplitud del paquete
+  plasma_freq=2*pi*2.1556e15!frecuencia angular de plasma
+  drude_gamma=2*pi*1.836e13 !frecuencia de colisiones
+  material_limits(1)=nx-80
+  material_limits(2)=nx-20
+  material_limits(3)=200
+  material_limits(4)=nz-200
  end subroutine read_default_values
+
+ subroutine gaussian_square_packet(center_x,center_z,angle,wln,inwidth,inlength)
+ implicit none
+ integer, intent(in) :: center_x,center_z, inlength
+ real,intent(in):: angle, wln, inwidth
+ real :: width, length, denomx, denomz
+ real :: Np, wavevec(2), orto_vec(2), rex(2), rez(2), rh(2)
+ integer :: i, k
+  width=wln*inwidth
+  length=wln*inlength
+  Np=wln/dx
+  wavevec(1)=2*pi*cos(angle)/wln
+  wavevec(2)=2*pi*sin(angle)/wln
+  orto_vec(1)=-wavevec(2)
+  orto_vec(2)=wavevec(1)
+  do i=1,nx
+   do k=1,nz
+    rex(1)=(i-center_x)*dx
+    rex(2)=(k+0.5-center_z)*dz
+    rez(1)=(i+0.5-center_x)*dx
+    rez(2)=(k-center_z)*dz
+    rh(1)=(i+0.5+0.5*(1.0-s)-center_x)*dx
+    rh(2)=(k+0.5+0.5*(1.0-s)-center_z)*dz
+    if(abs(dot_product(wavevec,rex)/(2*pi))&
+       .lt.inlength/2.0&
+    .and.abs(dot_product(orto_vec,rex/(2*pi))).lt.5.0*inwidth/2.0)then
+     Ex(i,k)= E_o*sin(angle)*sin(dot_product(wavevec,rex))*&
+        exp(-dot_product(orto_vec,rex/(2*pi))**2.0/inwidth**2.0)
+    endif
+    if(abs(dot_product(wavevec,rez)/(2*pi))&
+       .lt.inlength/2.0&
+    .and.abs(dot_product(orto_vec,rez/(2*pi))).lt.5.0*inwidth/2.0)then
+     Ez(i,k)=-E_o*cos(angle)*sin(dot_product(wavevec,rez))*&
+        exp(-dot_product(orto_vec,rez/(2*pi))**2.0/inwidth**2.0)
+    endif
+    if(abs(dot_product(wavevec,rh/(2*pi)))&
+       .lt.inlength/2.0&
+    .and.abs(dot_product(orto_vec,rex/(2*pi))).lt.5.0*inwidth/2.0)then
+     H(i,k) = E_o*sin(dot_product(wavevec,rh))*&
+        exp(-dot_product(orto_vec,rez/(2*pi))**2.0/inwidth**2.0)
+    endif
+   end do
+  end do
+ end subroutine gaussian_square_packet
 
  subroutine gaussian_packet(center_x,center_z,angle,wln,inwidth,inlength)
  implicit none
  integer, intent(in) :: center_x,center_z
  real, intent (in) :: angle, wln, inwidth, inlength
  real :: width, length, denomx, denomz
- real :: Np, wavevec(2),unit_vec(2),rex(2),rez(2),rh(2)
+ real :: Np, wavevec(2),rex(2),rez(2),rh(2)
  integer :: i, k
   width=wln*inwidth
   length=wln*inlength
@@ -71,8 +116,10 @@ contains
 
  subroutine impose_initial_conditions
  implicit none
- call gaussian_packet(nint(nx*3/10.),nint(nz*5/10.),0.,&
-                    wavelength,packetwidth,packetlength)
+ call gaussian_square_packet(nx-1000,nz/2-132,0.1134,&
+                    wavelength,packetwidth,nint(packetlength))
+ !call gaussian_packet(nint(nx*8.5/10.),nint(nz*4.7/10.),pi/36,&
+ !                   wavelength,packetwidth,packetlength)
  end subroutine impose_initial_conditions
 
  integer function read_integer(k,variable)
@@ -170,7 +217,8 @@ contains
  imax=material_limits(2)
  kmin=material_limits(3)
  kmax=material_limits(4)
-! call slab_of_glass(20,imin-1,20,nz-20)
+! call slab_of_glass(imin,imax,kmin,kmax)
+! call no_metal
  call slab_of_metal(imin,imax,kmin,kmax)
  end subroutine build_physical_space
 
@@ -178,35 +226,102 @@ contains
  implicit none
  integer, intent(in) :: imin,imax,kmin,kmax
  integer :: i,k
+ integer :: T, width, depth
  do i=imin,imax
   do k=kmin,kmax
-   epsx(i,k)=(1.75)**2.
-   epsz(i,k)=(1.75)**2.
+   epsx(i,k)=(2.0)**2.
+   epsz(i,k)=(2.0)**2.
   end do
- end do 
+ end do
+! sergio's design
+ T=nint(wavelength*0.863/dz)
+ width=nint(wavelength*0.425/dx)
+ depth=nint(wavelength*0.175/dx)
+write(*,*)'width',width
+write(*,*)'depth',depth
+write(*,*)'T    ',T
+! call dielectric_hole(nz/2,width,depth)
+! call dielectric_hole(nz/2+T,width,depth)
+! call dielectric_hole(nz/2+2*T,width,depth)
+! call dielectric_hole(nz/2-T,width,depth)
+! call dielectric_hole(nz/2-2*T,width,depth)
  end subroutine slab_of_glass
+
+ subroutine no_metal
+ implicit none
+ allocate(metal_array(1:nx,1:nz))
+ metal_array(:,:)=.false.
+ end subroutine
 
  subroutine slab_of_metal(imin,imax,kmin,kmax)
  implicit none
  integer, intent(in) :: imin,imax,kmin,kmax
  allocate(psix(imin:imax,kmin:kmax))
  allocate(psiz(imin:imax,kmin:kmax))
+ allocate(metal_array(1:nx,1:nz))
  psix(:,:)=0.
  psiz(:,:)=0.
+ call define_metal_array
  end subroutine slab_of_metal
 
  function inside_metal(i,k)
  implicit none
  logical :: inside_metal
  integer, intent(in) :: i,k
-  if(  ((i.ge.material_limits(1)).and.(i.le.material_limits(2)))&
-  .and.((k.ge.material_limits(3)).and.(k.le.material_limits(4))) )then
-  inside_metal=.true.
-  else
-  inside_metal=.false.
-  endif
-  ! hexagono!!!!!!!
+  inside_metal=metal_array(i,k)
  end function inside_metal
+
+ subroutine define_metal_array
+ implicit none
+ integer :: i,k
+ integer :: T, width, depth
+ ! metallic wall
+ do k=1,nz
+  do i=1,nx
+   if(  ((i.ge.material_limits(1)).and.(i.le.material_limits(2)))&
+   .and.((k.ge.material_limits(3)).and.(k.le.material_limits(4))) )then
+    metal_array(i,k)=.true.
+   else
+    metal_array(i,k)=.false.
+   endif
+  end do
+ end do
+ ! sergio's design
+ T=nint(wavelength*0.863/dz)
+ width=nint(wavelength*0.425/dx)
+ depth=nint(wavelength*0.175/dx)
+write(*,*)'width',width
+write(*,*)'depth',depth
+write(*,*)'T    ',T
+ call carve_hole(nz/2,width,depth)
+ call carve_hole(nz/2+T,width,depth)
+ call carve_hole(nz/2+2*T,width,depth)
+ call carve_hole(nz/2-T,width,depth)
+ call carve_hole(nz/2-2*T,width,depth)
+ end subroutine define_metal_array
+
+ subroutine carve_hole(zz,width,depth)
+ implicit none
+ integer :: i,k
+ integer :: zz, width, depth
+ do k=zz-width/2,zz+width/2
+  do i=material_limits(1),material_limits(1)+depth
+   metal_array(i,k)=.false.
+  end do
+ end do
+ end subroutine carve_hole
+
+ subroutine dielectric_hole(zz,width,depth)
+ implicit none
+ integer :: i,k
+ integer :: zz, width, depth
+ do k=zz-width/2,zz+width/2
+  do i=material_limits(1),material_limits(1)+depth
+   epsx(i,k)=1.0
+   epsz(i,k)=1.0
+  end do
+ enddo
+ end subroutine dielectric_hole
 
  subroutine propagate_H
  implicit none
@@ -249,12 +364,12 @@ contains
  end do
  ! Absorbing boundary conditions Mur, first order
  do k=1,nz
-  Ez(1,k)=Ezsav1(k)+czabc*(Ez(2,k)-Ez(1,k))
-  Ez(nx+1,k)=Ezsav2(k)+czabc*(Ez(nx,k)-Ez(nx+1,k))
+  Ez(1,k)=Ezsav1(k)+czabc*(Ez(2,k)-Ezsav1(k))
+  Ez(nx+1,k)=Ezsav2(k)+czabc*(Ez(nx,k)-Ezsav2(k))
  end do
  do i=1,nx
-  Ex(i,1)=Exsav1(i)+cxabc*(Ex(i,2)-Ex(i,1))
-  Ex(i,nz+1)=Exsav2(i)+cxabc*(Ex(i,nz)-Ex(i,nz+1))
+  Ex(i,1)=Exsav1(i)+cxabc*(Ex(i,2)-Exsav1(i))
+  Ex(i,nz+1)=Exsav2(i)+cxabc*(Ex(i,nz)-Exsav2(i))
  end do
  end subroutine propagate_E
 
